@@ -322,7 +322,12 @@ export function doFetchDevStrings() {
   return (dispatch: Dispatch, getState: GetState) => {
     // @if process.env.NODE_ENV!='production'
     if (process.env.NODE_ENV !== 'production' && !window.app_strings) {
-      fetch(`${URL_DEV}/app-strings.json`)
+      // In the Base44 preview the dev server serves both the app and `static/`, so
+      // the strings are available on the page's own origin. URL_DEV points at a
+      // webpack dev server port that does not exist there.
+      const devStringsUrl =
+        process.env.BASE44_PREVIEW_MODE === '1' ? '/app-strings.json' : `${URL_DEV}/app-strings.json`;
+      fetch(devStringsUrl)
         .then((r) => r.json())
         .then((j) => (window.app_strings = j))
         .catch(() => {});

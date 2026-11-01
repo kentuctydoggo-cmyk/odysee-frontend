@@ -50,9 +50,11 @@ With the flag unset or any other value, `vite.config.ts` behaves exactly as befo
 
 ## Known quirks
 
-- `ui/redux/actions/settings.ts` fetches `http://localhost:${WEBPACK_WEB_PORT}/app-strings.json`
-  in development; that file is not served by Vite, so the request fails once and the
-  app falls back to `https://odysee.com/app-strings/en.json`. Harmless.
+- `ui/redux/actions/settings.ts` fetches dev translation strings in development. With
+  the sandbox flag on it reads `/app-strings.json` from the page's own origin (Vite
+  serves `static/`), because `URL_DEV` points at the webpack dev port
+  (`localhost:9090`), which is not reachable from the preview browser. With the flag
+  off the original `URL_DEV` request is unchanged.
 - `player.odycdn.com` hotlink-protects by `Referer` (see override 3). Video and
   audio play in the preview through the `/__b44` media proxy; the CDN occasionally
   answers `429 Try again later` to this sandbox's egress IP, which is transient.
