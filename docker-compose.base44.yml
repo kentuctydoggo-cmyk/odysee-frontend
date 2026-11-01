@@ -1,0 +1,73 @@
+# Base44 development environment.
+#
+# Runs the Vite dev server from the cloned source (bind mount) so edits are
+# reflected live. The Vite server listens on host port 3000, which is the
+# preview entry point.
+#
+# The app is a pure frontend: it talks to Odysee's public APIs configured in
+# `.env.defaults`, so no local backend or database is required.
+
+services:
+  web:
+    image: node:22
+    init: true
+    restart: on-failure
+    working_dir: /app
+    ports:
+      - '3000:3000'
+    environment:
+      - CI=true
+      # Vite dev server bind address/port (see server.* in vite.config.ts).
+      - WEB_SERVER_PORT=3000
+      - DEV_HOST=0.0.0.0
+      # Never let a git dependency prompt interactively.
+      - GIT_TERMINAL_PROMPT=0
+      # Sandbox preview host allowlisting (see vite.config.ts server.allowedHosts).
+      - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS
+      - BASE44_PREVIEW_MODE
+      - BASE44_SANDBOX_HOST_DOMAIN
+      # The Odysee APIs are origin-locked (odysee.com / localhost only), so the
+      # browser cannot call them from the preview hostname. Point every API base
+      # at the dev server's same-origin proxy (server.proxy in vite.config.ts).
+      - LBRY_API_URL=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/api.odysee.com
+      - LOCALE_API=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/api.odysee.com/legal/requirements
+      - GEO_BLOCK_API=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/api.odysee.com/geo/blocked_list
+      - LBRY_WEB_API=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/api.na-backend.odysee.com
+      - LBRY_WEB_API_NO_CF=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/naked-api.na-backend.odysee.com
+      - LBRY_WEB_PUBLISH_API=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/publish.na-backend.odysee.com/v1
+      - LBRY_WEB_PUBLISH_API_V2=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/publish.na-backend.odysee.com/api/v2/publish/
+      - LBRY_WEB_PUBLISH_API_V3=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/publish.na-backend.odysee.com/api/v3/publish/
+      - LBRY_WEB_PUBLISH_API_V4=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/api.na-backend.odysee.com/api/v1/asynqueries
+      - LBRY_WEB_BUFFER_API=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/collector-service.api.lbry.tv/api/v1/events/video
+      - COMMENT_SERVER_API=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/comments.odysee.tv/api/v2
+      - SEARCH_SERVER_API=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/lighthouse.odysee.tv/search
+      - SEARCH_SERVER_API_ALT=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/recsys.odysee.tv/search
+      - RECSYS_ENDPOINT=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/recsys.odysee.tv/v1/lvv
+      - RECSYS_FYP_ENDPOINT=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/recsys.odysee.tv/v1/u
+      - SHORT_URL_API=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/api.ody.sh/api
+      - LIVESTREAM_SERVER_API=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/api.odysee.live
+      - SOCKETY_SERVER_API=wss://3000-${BASE44_PUBLIC_HOST_SUFFIX}/__b44/sockety.odysee.tv/ws
+    volumes:
+      - .:/app
+    command:
+      - sh
+      - -ec
+      - |
+        # The lockfile references git dependencies with scp-style URLs
+        # (git@github.com:...) which need an SSH key. Rewrite them to HTTPS
+        # inside this container only, so the checked-in lockfile is untouched.
+        git config --global url."https://github.com/".insteadOf "git@github.com:"
+        corepack enable
+        pnpm config set store-dir /pnpm-store
+        pnpm install --frozen-lockfile
+        exec pnpm dev
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 300s

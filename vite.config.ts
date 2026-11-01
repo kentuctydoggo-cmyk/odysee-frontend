@@ -16,6 +16,49 @@ const __dirname = path.dirname(__filename);
 const LOCAL_USAGI_ROOT = path.resolve(__dirname, '../../odysee-media-usagi');
 const useLocalUsagi = process.env.USE_LOCAL_USAGI === 'true';
 
+// Base44 sandbox only: the Odysee APIs answer with an origin allowlist that
+// covers odysee.com and localhost, so browser calls from the preview hostname
+// are rejected. Route those hosts through this dev server (same origin) and
+// point the matching `*_API*` env values at it from docker-compose.base44.yml.
+const PREVIEW_PROXY_PREFIX = '/__b44';
+const PREVIEW_API_HOSTS = [
+  'api.odysee.com',
+  'api.na-backend.odysee.com',
+  'naked-api.na-backend.odysee.com',
+  'publish.na-backend.odysee.com',
+  'comments.odysee.tv',
+  'lighthouse.odysee.tv',
+  'recsys.odysee.tv',
+  'sockety.odysee.tv',
+  'api.odysee.live',
+  'api.ody.sh',
+  'collector-service.api.lbry.tv',
+];
+function buildPreviewApiProxy() {
+  if (process.env.BASE44_PREVIEW_MODE !== '1') return undefined;
+
+  const proxy: Record<string, any> = {
+    // The app reads its homepage/site content from its own production server
+    // (`/$/api/content/...`); serve that from odysee.com here.
+    '/$/api/content': { target: 'https://odysee.com', changeOrigin: true, secure: true },
+  };
+
+  for (const host of PREVIEW_API_HOSTS) {
+    const prefix = `${PREVIEW_PROXY_PREFIX}/${host}`;
+    proxy[prefix] = {
+      target: `https://${host}`,
+      changeOrigin: true,
+      secure: true,
+      ws: true,
+      rewrite: (url: string) => url.slice(prefix.length) || '/',
+    };
+  }
+
+  return proxy;
+}
+
+const previewApiProxy = buildPreviewApiProxy();
+
 const UI_ROOT = path.resolve(__dirname, 'ui');
 const WEB_ROOT = path.resolve(__dirname, 'web');
 const CUSTOM_HOMEPAGES_ROOT = path.resolve(__dirname, 'custom/homepages/v2');
@@ -949,6 +992,13 @@ export default defineConfig({
   server: {
     port: parseInt(process.env.WEB_SERVER_PORT || process.env.WEBPACK_WEB_PORT || '9090', 10),
     host: process.env.DEV_HOST || 'localhost',
+    // Base44 sandbox previews reach the dev server through a proxied hostname
+    // (`<port>-<sandbox id>.<sandbox domain>`), which Vite's host check rejects
+    // unless allowed. Enabled only inside the sandbox.
+    ...(process.env.BASE44_PREVIEW_MODE === '1' && process.env.BASE44_SANDBOX_HOST_DOMAIN
+      ? { allowedHosts: [`.${process.env.BASE44_SANDBOX_HOST_DOMAIN}`] }
+      : {}),
+    ...(previewApiProxy ? { proxy: previewApiProxy } : {}),
     https:
       process.env.DEV_HTTPS_CERT && process.env.DEV_HTTPS_KEY
         ? {
