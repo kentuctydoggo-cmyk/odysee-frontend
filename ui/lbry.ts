@@ -3,6 +3,7 @@ import { FETCH_TIMEOUT, SDK_FETCH_TIMEOUT } from 'constants/errors';
 import { NO_AUTH, X_LBRY_AUTH_TOKEN } from 'constants/token';
 import fetchWithTimeout from 'util/fetch';
 import { PROXY_URL_NO_CF } from 'config';
+import { rewritePreviewMediaUrls } from 'util/preview-media';
 
 import 'proxy-polyfill';
 import { createPurchaseProtectedGet, hasValidFiatPurchase } from 'util/purchase-protection';
@@ -337,7 +338,8 @@ export function apiCall(
         return reject(error);
       } else {
         ApiFailureMgr.logSuccess(method, params);
-        return resolve(response.result);
+        // No-op unless BASE44_PREVIEW_MODE is on (see util/preview-media).
+        return resolve(rewritePreviewMediaUrls(response.result));
       }
     })
     .catch((err) => {

@@ -34,6 +34,9 @@ const PREVIEW_API_HOSTS = [
   'api.ody.sh',
   'collector-service.api.lbry.tv',
 ];
+// Media hosts hotlink-protect by Referer (401 for the preview hostname), so
+// they are proxied too — with an odysee.com Referer/Origin.
+const PREVIEW_MEDIA_HOSTS = ['player.odycdn.com', 'secure.odycdn.com'];
 function buildPreviewApiProxy() {
   if (process.env.BASE44_PREVIEW_MODE !== '1') return undefined;
 
@@ -51,6 +54,18 @@ function buildPreviewApiProxy() {
       secure: true,
       ws: true,
       rewrite: (url: string) => url.slice(prefix.length) || '/',
+    };
+  }
+
+  for (const host of PREVIEW_MEDIA_HOSTS) {
+    const prefix = `${PREVIEW_PROXY_PREFIX}/${host}`;
+    proxy[prefix] = {
+      target: `https://${host}`,
+      changeOrigin: true,
+      secure: true,
+      rewrite: (url: string) => url.slice(prefix.length) || '/',
+      // The CDN only serves media to odysee.com referrers.
+      headers: { referer: 'https://odysee.com/', origin: 'https://odysee.com' },
     };
   }
 
@@ -129,6 +144,8 @@ function buildEnvDefines() {
   defines['process.env.MOONPAY_SECRET_KEY'] = JSON.stringify(process.env.MOONPAY_SECRET_KEY || '');
   defines['process.env.SDK_API_URL'] = JSON.stringify(process.env.SDK_API_URL || process.env.LBRY_WEB_API || '');
   defines['process.env.BUILD_REV'] = JSON.stringify(process.env.BUILD_REV || '');
+  // Sandbox preview flag, read by ui/util/preview-media.ts.
+  defines['process.env.BASE44_PREVIEW_MODE'] = JSON.stringify(process.env.BASE44_PREVIEW_MODE || '');
   defines['process.env.SEARCH_API_URL'] = JSON.stringify(process.env.SEARCH_API_URL || '');
   defines['process.env.DEV_CHANGELOG'] = JSON.stringify(
     process.env.NODE_ENV === 'production' ? '' : process.env.DEV_CHANGELOG || ''

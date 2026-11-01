@@ -1,6 +1,7 @@
 import * as ICONS from 'constants/icons';
 import * as PAGES from 'constants/pages';
 import React from 'react';
+import { ENABLE_MATURE } from 'config';
 import * as SETTINGS from 'constants/settings';
 import * as COLLECTIONS from 'constants/collections';
 import { Lbryio } from 'lbryinc';
@@ -14,7 +15,7 @@ import TagsSearch from 'component/tagsSearch';
 import { useAppSelector, useAppDispatch } from 'redux/hooks';
 
 import { doSetClientSetting } from 'redux/actions/settings';
-import { selectClientSetting, selectHideYouTubeMirrors } from 'redux/selectors/settings';
+import { selectClientSetting, selectHideYouTubeMirrors, selectShowMatureContent } from 'redux/selectors/settings';
 import { selectUserVerifiedEmail } from 'redux/selectors/user';
 
 type Price = {
@@ -28,6 +29,7 @@ export default function SettingContent() {
   const hideMembersOnlyContent = useAppSelector((state) => selectClientSetting(state, SETTINGS.HIDE_MEMBERS_ONLY_CONTENT));
   const hideReposts = useAppSelector((state) => selectClientSetting(state, SETTINGS.HIDE_REPOSTS));
   const hideShorts = useAppSelector((state) => selectClientSetting(state, SETTINGS.HIDE_SHORTS));
+  const showMature = useAppSelector(selectShowMatureContent);
   const hiddenTagsSetting = useAppSelector((state) => selectClientSetting(state, SETTINGS.HIDDEN_TAGS));
   const hiddenTags = Array.isArray(hiddenTagsSetting) ? hiddenTagsSetting : [];
   const hideLivestreams = useAppSelector((state) => selectClientSetting(state, SETTINGS.HIDE_LIVESTREAMS_IN_CATEGORIES));
@@ -76,6 +78,12 @@ export default function SettingContent() {
             <SettingsRow title={__('Hide short content')} subtitle={__(HELP.HIDE_SHORTS)}>
               <FormField type="checkbox" name="hide_shorts" checked={hideShorts} onChange={() => setClientSetting(SETTINGS.HIDE_SHORTS, !hideShorts)} />
             </SettingsRow>
+
+            {ENABLE_MATURE && (
+              <SettingsRow title={__('Show mature content')} subtitle={__(HELP.SHOW_MATURE)}>
+                <FormField type="checkbox" name="show_mature" checked={showMature} onChange={() => setClientSetting(SETTINGS.SHOW_MATURE, !showMature)} />
+              </SettingsRow>
+            )}
 
             <SettingsRow title={__('Hidden tags')} subtitle={__(HELP.HIDDEN_TAGS)}>
               <TagsSearch label={__('Hidden tags')} labelAddNew={__('Add tags')} labelSuggestions={__('Suggestions')} onRemove={removeHiddenTag} onSelect={addHiddenTags} disableAutoFocus tagsPassedIn={hiddenTagObjects} placeholder={__('Add tags to hide')} hideSuggestions disableControlTags />

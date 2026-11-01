@@ -41,15 +41,24 @@ With the flag unset or any other value, `vite.config.ts` behaves exactly as befo
    paths. `/$/api/content/v2/get` (the homepage/site content JSON) is proxied to
    `odysee.com` for the same reason. Any new API host must be added to
    `PREVIEW_API_HOSTS` in `vite.config.ts`.
+3. **Media playback** — `player.odycdn.com` / `secure.odycdn.com` hotlink-protect by
+   `Referer` and answer `401` to the preview hostname. With the flag on,
+   `vite.config.ts` proxies those hosts at `/__b44/<host>/...` with an `odysee.com`
+   referer, and `ui/util/preview-media.ts` rewrites the `streaming_url` values in
+   daemon responses (`apiCall` in `ui/lbry.ts`) to the proxy path. With the flag
+   off, URLs pass through unchanged.
 
 ## Known quirks
 
 - `ui/redux/actions/settings.ts` fetches `http://localhost:${WEBPACK_WEB_PORT}/app-strings.json`
   in development; that file is not served by Vite, so the request fails once and the
   app falls back to `https://odysee.com/app-strings/en.json`. Harmless.
-- `player.odycdn.com` hotlink-protects `HEAD` requests by `Referer`: they return 401
-  for any referer other than `odysee.com`. Byte-range `GET`s work, but the video
-  player's duration probe may report `0:00` in the preview.
+- `player.odycdn.com` hotlink-protects by `Referer` (see override 3). Video and
+  audio play in the preview through the `/__b44` media proxy; the CDN occasionally
+  answers `429 Try again later` to this sandbox's egress IP, which is transient.
+- Mature content is enabled through `ENABLE_MATURE=true` in `.env.defaults`, and
+  `ui/component/settingContent/view.tsx` exposes a **Show mature content** toggle
+  (this frontend originally had no such control, only a "use the desktop app" note).
 - The app creates an anonymous user on first load (`POST /user/new`); that call is
   proxied too, so "Could not get a user ID" only appears when the proxy is broken.
 
